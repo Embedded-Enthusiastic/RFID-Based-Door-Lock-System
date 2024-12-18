@@ -1,0 +1,77 @@
+#include <SPI.h>
+#include <MFRC522.h>
+#include <Servo.h>
+
+#define RST_PIN 9
+#define SS_PIN 10
+
+MFRC522 rfid(SS_PIN, RST_PIN);
+Servo myServo;
+
+const int greenLED = 7;
+const int redLED = 6;
+const int buzzer = 5;
+
+String authorizedUID = "A0B1C2D3"; // Replace with your RFID tag's unique ID
+
+void setup() {
+  Serial.begin(9600);
+  SPI.begin();
+  rfid.PCD_Init();
+  
+  pinMode(greenLED, OUTPUT);
+  pinMode(redLED, OUTPUT);
+  pinMode(buzzer, OUTPUT);
+  
+  myServo.attach(8);
+  myServo.write(0); // Lock position
+  
+  Serial.println("Place your RFID tag near the reader.");
+}
+
+void loop() {
+  if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()) {
+    return;
+  }
+  
+  String tagUID = "";
+  for (byte i = 0; i < rfid.uid.size; i++) {
+    tagUID += String(rfid.uid.uidByte[i], HEX);
+  }
+  
+  Serial.println("Tag UID: " + tagUID);
+  
+  if (tagUID.equalsIgnoreCase(authorizedUID)) {
+    unlockDoor();
+  } else {
+    denyAccess();
+  }
+  
+  rfid.PICC_HaltA();
+  rfid.PCD_StopCrypto1();
+}
+
+void unlockDoor() {
+  digitalWrite(greenLED, HIGH);
+  digitalWrite(redLED, LOW);
+  digitalWrite(buzzer, LOW);
+  
+  myServo.write(90); // Unlock position
+  Serial.println("Access Granted");
+  delay(3000); // Door remains open for 3 seconds
+  
+  myServo.write(0); // Lock again
+  digitalWrite(greenLED, LOW);
+}
+
+void denyAccess() {
+  digitalWrite(redLED, HIGH);
+  digitalWrite(greenLED, LOW);
+  digitalWrite(buzzer, HIGH);
+  
+  Serial.println("Access Denied");
+  delay(2000);
+  
+  digitalWrite(redLED, LOW);
+  digitalWrite(buzzer, LOW);
+}
